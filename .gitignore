@@ -1,0 +1,6 @@
+# Excluir directorios
+/mnist_data/
+/fashion_data/
+/build/
+/venv/
+/.venv/

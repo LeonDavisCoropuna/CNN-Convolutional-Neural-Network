@@ -4,259 +4,228 @@
 #include <random>
 #include <cmath>
 #include <iostream>
+#include "../../utils/activations.hpp"
 
 class Conv2DLayer : public Layer {
 private:
-    // Parámetros de la convolución
-    int input_channels_;
-    int output_channels_;
-    int kernel_size_;
+    int inputChannels_;
+    int outputChannels_;
+    int kernelSize_;
     int stride_;
     int padding_;
-    
-    // Dimensiones de entrada/salida
-    int input_height_;
-    int input_width_;
-    int output_height_;
-    int output_width_;
-    
+    int inputHeight_;
+    int inputWidth_;
+    int outputHeight_;
+    int outputWidth_;
+
     // Pesos y biases
-    std::vector<std::vector<std::vector<std::vector<float>>>> weights_; // [output_ch][input_ch][k_h][k_w]
+    std::vector<std::vector<std::vector<std::vector<float>>>> weights_;
     std::vector<float> biases_;
-    
+
     // Cache para forward/backward
+    std::vector<float> inputsCache_;
+    std::vector<float> preActivations_; // <-- Declara aquí
     std::vector<float> outputs_;
-    std::vector<float> inputs_cache_;
     std::vector<float> deltas_;
-    
+
     // Gradientes
-    std::vector<std::vector<std::vector<std::vector<float>>>> weights_grad_;
-    std::vector<float> biases_grad_;
-    
-    bool is_training_;
+    std::vector<std::vector<std::vector<std::vector<float>>>> weightsGrad_;
+    std::vector<float> biasesGrad_;
+
+    bool isTraining_;
+    ActivationFunction* activation_;
 
 public:
-    Conv2DLayer(int input_channels, int output_channels, int kernel_size, 
-           int input_height, int input_width, int stride = 1, int padding = 0)
-        : input_channels_(input_channels), output_channels_(output_channels),
-          kernel_size_(kernel_size), stride_(stride), padding_(padding),
-          input_height_(input_height), input_width_(input_width) {
-        
-        // Calcular dimensiones de salida
-        output_height_ = (input_height_ + 2 * padding_ - kernel_size_) / stride_ + 1;
-        output_width_ = (input_width_ + 2 * padding_ - kernel_size_) / stride_ + 1;
-        
-        // Inicializar pesos y biases
-        initialize_weights();
-        
-        // Inicializar gradientes
-        weights_grad_ = std::vector<std::vector<std::vector<std::vector<float>>>>(
-            output_channels_, std::vector<std::vector<std::vector<float>>>(
-                input_channels_, std::vector<std::vector<float>>(
-                    kernel_size_, std::vector<float>(kernel_size_, 0.0f))));
-        biases_grad_ = std::vector<float>(output_channels_, 0.0f);
-        
-        // Reservar espacio para outputs y deltas
-        outputs_.resize(output_channels_ * output_height_ * output_width_);
-        deltas_.resize(input_channels_ * input_height_ * input_width_);
-        
-        is_training_ = true;
+    Conv2DLayer(int inputChannels, int outputChannels, int kernelSize,
+                int inputHeight, int inputWidth,
+                ActivationFunction* activation,
+                int stride = 1, int padding = 0)
+      : inputChannels_(inputChannels), outputChannels_(outputChannels),
+        kernelSize_(kernelSize), stride_(stride), padding_(padding),
+        inputHeight_(inputHeight), inputWidth_(inputWidth),
+        activation_(activation), isTraining_(true)
+    {
+        outputHeight_ = (inputHeight_ + 2 * padding_ - kernelSize_) / stride_ + 1;
+        outputWidth_  = (inputWidth_  + 2 * padding_ - kernelSize_) / stride_ + 1;
+
+        initializeWeights();
+
+        weightsGrad_.assign(
+            outputChannels_,
+            std::vector<std::vector<std::vector<float>>>(
+                inputChannels_,
+                std::vector<std::vector<float>>(
+                    kernelSize_, std::vector<float>(kernelSize_, 0.0f))));
+        biasesGrad_.assign(outputChannels_, 0.0f);
+
+        // Reservar buffers
+        inputsCache_.reserve(inputChannels_ * inputHeight_ * inputWidth_);
+        outputs_.assign(outputChannels_ * outputHeight_ * outputWidth_, 0.0f);
+        preActivations_.assign(outputChannels_ * outputHeight_ * outputWidth_, 0.0f);
+        deltas_.assign(inputChannels_ * inputHeight_ * inputWidth_, 0.0f);
     }
 
-    void initialize_weights() {
-        // Inicialización He (Kaiming)
-        float stddev = sqrtf(2.0f / (kernel_size_ * kernel_size_ * input_channels_));
+    void initializeWeights() {
+        float stddev = sqrtf(2.0f / (kernelSize_ * kernelSize_ * inputChannels_));
         std::normal_distribution<float> dist(0.0f, stddev);
-        
-        weights_.resize(output_channels_);
-        for (int oc = 0; oc < output_channels_; ++oc) {
-            weights_[oc].resize(input_channels_);
-            for (int ic = 0; ic < input_channels_; ++ic) {
-                weights_[oc][ic].resize(kernel_size_);
-                for (int kh = 0; kh < kernel_size_; ++kh) {
-                    weights_[oc][ic][kh].resize(kernel_size_);
-                    for (int kw = 0; kw < kernel_size_; ++kw) {
+        weights_.resize(outputChannels_);
+        for (int oc = 0; oc < outputChannels_; ++oc) {
+            weights_[oc].resize(inputChannels_);
+            for (int ic = 0; ic < inputChannels_; ++ic) {
+                weights_[oc][ic].resize(kernelSize_);
+                for (int kh = 0; kh < kernelSize_; ++kh) {
+                    weights_[oc][ic][kh].resize(kernelSize_);
+                    for (int kw = 0; kw < kernelSize_; ++kw) {
                         weights_[oc][ic][kh][kw] = dist(gen);
                     }
                 }
             }
         }
-        
-        biases_.resize(output_channels_, 0.0f);
+        biases_.assign(outputChannels_, 0.0f);
     }
 
     std::vector<float> forward(const std::vector<float> &input) override {
-        inputs_cache_ = input; // Guardar para backward pass
-        
-        // Aplicar convolución
-        for (int oc = 0; oc < output_channels_; ++oc) {
-            for (int oh = 0; oh < output_height_; ++oh) {
-                for (int ow = 0; ow < output_width_; ++ow) {
+        inputsCache_ = input;
+        // Asegura tamaño de outputs y preActivations
+        int outSize = outputChannels_ * outputHeight_ * outputWidth_;
+        outputs_.assign(outSize, 0.0f);
+        preActivations_.assign(outSize, 0.0f);
+
+        for (int oc = 0; oc < outputChannels_; ++oc) {
+            for (int oh = 0; oh < outputHeight_; ++oh) {
+                for (int ow = 0; ow < outputWidth_; ++ow) {
                     float sum = 0.0f;
-                    
-                    for (int ic = 0; ic < input_channels_; ++ic) {
-                        for (int kh = 0; kh < kernel_size_; ++kh) {
-                            for (int kw = 0; kw < kernel_size_; ++kw) {
+                    for (int ic = 0; ic < inputChannels_; ++ic) {
+                        for (int kh = 0; kh < kernelSize_; ++kh) {
+                            for (int kw = 0; kw < kernelSize_; ++kw) {
                                 int ih = oh * stride_ + kh - padding_;
                                 int iw = ow * stride_ + kw - padding_;
-                                
-                                if (ih >= 0 && ih < input_height_ && iw >= 0 && iw < input_width_) {
-                                    int input_idx = ic * (input_height_ * input_width_) + ih * input_width_ + iw;
-                                    sum += input[input_idx] * weights_[oc][ic][kh][kw];
+                                if (ih >= 0 && ih < inputHeight_ && iw >= 0 && iw < inputWidth_) {
+                                    int inputIdx = ic * inputHeight_ * inputWidth_ + ih * inputWidth_ + iw;
+                                    sum += input[inputIdx] * weights_[oc][ic][kh][kw];
                                 }
                             }
                         }
                     }
-                    
                     sum += biases_[oc];
-                    int output_idx = oc * (output_height_ * output_width_) + oh * output_width_ + ow;
-                    outputs_[output_idx] = sum;
+                    int outIdx = oc * outputHeight_ * outputWidth_ + oh * outputWidth_ + ow;
+                    preActivations_[outIdx] = sum;
+                    outputs_[outIdx] = activation_ ? activation_->activate(sum) : sum;
                 }
             }
         }
-        
         return outputs_;
     }
 
-    void backward(const std::vector<float> *targets = nullptr,
-                 const Layer *next_layer = nullptr) override {
-        // Limpiar deltas
+    void backward(const std::vector<float>* targets = nullptr,
+                  const Layer* nextLayer = nullptr) override {
+        // Limpia deltas
         std::fill(deltas_.begin(), deltas_.end(), 0.0f);
-        
-        // Calcular deltas para esta capa
-        const std::vector<float>& next_deltas = next_layer->get_deltas();
-        
-        for (int ic = 0; ic < input_channels_; ++ic) {
-            for (int ih = 0; ih < input_height_; ++ih) {
-                for (int iw = 0; iw < input_width_; ++iw) {
-                    float delta = 0.0f;
-                    
-                    for (int oc = 0; oc < output_channels_; ++oc) {
-                        for (int kh = 0; kh < kernel_size_; ++kh) {
-                            for (int kw = 0; kw < kernel_size_; ++kw) {
+        const std::vector<float>& nextDeltas = nextLayer->get_deltas();
+
+        // Propaga error hacia atrás
+        for (int ic = 0; ic < inputChannels_; ++ic) {
+            for (int ih = 0; ih < inputHeight_; ++ih) {
+                for (int iw = 0; iw < inputWidth_; ++iw) {
+                    float deltaSum = 0.0f;
+                    for (int oc = 0; oc < outputChannels_; ++oc) {
+                        for (int kh = 0; kh < kernelSize_; ++kh) {
+                            for (int kw = 0; kw < kernelSize_; ++kw) {
                                 int oh = (ih - kh + padding_) / stride_;
                                 int ow = (iw - kw + padding_) / stride_;
-                                
-                                if (oh >= 0 && oh < output_height_ && ow >= 0 && ow < output_width_ &&
+                                if (oh >= 0 && oh < outputHeight_ &&
+                                    ow >= 0 && ow < outputWidth_ &&
                                     (ih - kh + padding_) % stride_ == 0 &&
                                     (iw - kw + padding_) % stride_ == 0) {
-                                    int next_delta_idx = oc * (output_height_ * output_width_) + oh * output_width_ + ow;
-                                    delta += next_deltas[next_delta_idx] * weights_[oc][ic][kh][kw];
+                                    int nextIdx = oc * (outputHeight_ * outputWidth_) + oh * outputWidth_ + ow;
+                                    float z = preActivations_[nextIdx];
+                                    float deriv = activation_ ? activation_->derivative(z) : 1.0f;
+                                    deltaSum += nextDeltas[nextIdx] * deriv * weights_[oc][ic][kh][kw];
                                 }
                             }
                         }
                     }
-                    
-                    int delta_idx = ic * (input_height_ * input_width_) + ih * input_width_ + iw;
-                    deltas_[delta_idx] = delta;
+                    int deltaIdx = ic * inputHeight_ * inputWidth_ + ih * inputWidth_ + iw;
+                    deltas_[deltaIdx] = deltaSum;
                 }
             }
         }
-        
-        if (is_training_) {
+        if (isTraining_) {
             accumulate_gradients();
         }
     }
 
     void accumulate_gradients() override {
-        // Calcular gradientes de los pesos
-        for (int oc = 0; oc < output_channels_; ++oc) {
-            for (int ic = 0; ic < input_channels_; ++ic) {
-                for (int kh = 0; kh < kernel_size_; ++kh) {
-                    for (int kw = 0; kw < kernel_size_; ++kw) {
+        // Asegura tamaños
+        for (int oc = 0; oc < outputChannels_; ++oc) {
+            for (int ic = 0; ic < inputChannels_; ++ic) {
+                for (int kh = 0; kh < kernelSize_; ++kh) {
+                    for (int kw = 0; kw < kernelSize_; ++kw) {
                         float grad = 0.0f;
-                        
-                        for (int oh = 0; oh < output_height_; ++oh) {
-                            for (int ow = 0; ow < output_width_; ++ow) {
+                        for (int oh = 0; oh < outputHeight_; ++oh) {
+                            for (int ow = 0; ow < outputWidth_; ++ow) {
                                 int ih = oh * stride_ + kh - padding_;
                                 int iw = ow * stride_ + kw - padding_;
-                                
-                                if (ih >= 0 && ih < input_height_ && iw >= 0 && iw < input_width_) {
-                                    int input_idx = ic * (input_height_ * input_width_) + ih * input_width_ + iw;
-                                    int output_idx = oc * (output_height_ * output_width_) + oh * output_width_ + ow;
-                                    grad += inputs_cache_[input_idx] * deltas_[output_idx];
+                                if (ih >= 0 && ih < inputHeight_ && iw >= 0 && iw < inputWidth_) {
+                                    int inputIdx = ic * inputHeight_ * inputWidth_ + ih * inputWidth_ + iw;
+                                    int outIdx = oc * outputHeight_ * outputWidth_ + oh * outputWidth_ + ow;
+                                    grad += inputsCache_[inputIdx] * deltas_[outIdx];
                                 }
                             }
                         }
-                        
-                        weights_grad_[oc][ic][kh][kw] += grad;
+                        weightsGrad_[oc][ic][kh][kw] += grad;
                     }
                 }
             }
         }
-        
-        // Calcular gradientes de los biases
-        for (int oc = 0; oc < output_channels_; ++oc) {
-            float bias_grad = 0.0f;
-            for (int oh = 0; oh < output_height_; ++oh) {
-                for (int ow = 0; ow < output_width_; ++ow) {
-                    int output_idx = oc * (output_height_ * output_width_) + oh * output_width_ + ow;
-                    bias_grad += deltas_[output_idx];
+        for (int oc = 0; oc < outputChannels_; ++oc) {
+            float biasGrad = 0.0f;
+            for (int oh = 0; oh < outputHeight_; ++oh) {
+                for (int ow = 0; ow < outputWidth_; ++ow) {
+                    int outIdx = oc * outputHeight_ * outputWidth_ + oh * outputWidth_ + ow;
+                    biasGrad += deltas_[outIdx];
                 }
             }
-            biases_grad_[oc] += bias_grad;
+            biasesGrad_[oc] += biasGrad;
         }
     }
 
-    void apply_gradients(float batch_size) override {
-        // Normalizar gradientes por tamaño de batch
-        float scale = 1.0f / batch_size;
-        
-        // Actualizar pesos
-        for (int oc = 0; oc < output_channels_; ++oc) {
-            for (int ic = 0; ic < input_channels_; ++ic) {
-                for (int kh = 0; kh < kernel_size_; ++kh) {
-                    for (int kw = 0; kw < kernel_size_; ++kw) {
-                        weights_[oc][ic][kh][kw] -= scale * weights_grad_[oc][ic][kh][kw];
+    void apply_gradients(float batchSize) override {
+        float scale = 1.0f / batchSize;
+        for (int oc = 0; oc < outputChannels_; ++oc) {
+            for (int ic = 0; ic < inputChannels_; ++ic) {
+                for (int kh = 0; kh < kernelSize_; ++kh) {
+                    for (int kw = 0; kw < kernelSize_; ++kw) {
+                        weights_[oc][ic][kh][kw] -= scale * weightsGrad_[oc][ic][kh][kw];
                     }
                 }
             }
         }
-        
-        // Actualizar biases
-        for (int oc = 0; oc < output_channels_; ++oc) {
-            biases_[oc] -= scale * biases_grad_[oc];
+        for (int oc = 0; oc < outputChannels_; ++oc) {
+            biases_[oc] -= scale * biasesGrad_[oc];
         }
     }
 
     void zero_grad() override {
-        // Resetear gradientes de pesos
-        for (auto &oc : weights_grad_)
+        for (auto &oc : weightsGrad_)
             for (auto &ic : oc)
                 for (auto &kh : ic)
                     for (auto &kw : kh)
                         kw = 0.0f;
-        
-        // Resetear gradientes de biases
-        for (auto &bg : biases_grad_)
+        for (auto &bg : biasesGrad_)
             bg = 0.0f;
     }
 
-    // Getters
-    const std::vector<float> &get_outputs() const override { return outputs_; }
-    const std::vector<float> &get_deltas() const override { return deltas_; }
-    
-    const std::vector<std::vector<float>> &get_weights() const override {
-        // Necesitarías adaptar esta función según tu implementación
-        static std::vector<std::vector<float>> flat_weights;
-        return flat_weights;
+    const std::vector<float>& get_outputs() const override { return outputs_; }
+    const std::vector<float>& get_deltas() const override { return deltas_; }
+    const std::vector<std::vector<float>>& get_weights() const override {
+        static std::vector<std::vector<float>> dummy;
+        return dummy;
     }
-    
-    void set_weights(const std::vector<std::vector<float>> &new_weights) override {
-        // Implementación para cargar pesos pre-entrenados
-    }
-
-    int input_size() const override { 
-        return input_channels_ * input_height_ * input_width_; 
-    }
-    
-    int output_size() const override { 
-        return output_channels_ * output_height_ * output_width_; 
-    }
-    
+    void set_weights(const std::vector<std::vector<float>>& ) override {}
+    int input_size() const override { return inputChannels_ * inputHeight_ * inputWidth_; }
+    int output_size() const override { return outputChannels_ * outputHeight_ * outputWidth_; }
     bool has_weights() const override { return true; }
-    
-    void set_training(bool is_training) override { is_training_ = is_training; }
-
-    void update_weights () {}
+    void set_training(bool isTraining) override { isTraining_ = isTraining; }
+    void update_weights() override {} 
 };

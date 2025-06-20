@@ -1,0 +1,10 @@
+[1/10] Epoch Train Loss: 20.0035, Train Acc: 12.12% | Test Loss: 18.5725, Test Acc: 19.34%
+[2/10] Epoch Train Loss: 19.3095, Train Acc: 16.14% | Test Loss: 20.3176, Test Acc: 11.76%
+[3/10] Epoch Train Loss: 19.4338, Train Acc: 15.60% | Test Loss: 19.5256, Test Acc: 15.20%
+[4/10] Epoch Train Loss: 19.5489, Train Acc: 15.10% | Test Loss: 18.5033, Test Acc: 19.64%
+[5/10] Epoch Train Loss: 19.7285, Train Acc: 14.32% | Test Loss: 19.6499, Test Acc: 14.66%
+[6/10] Epoch Train Loss: 19.8114, Train Acc: 13.96% | Test Loss: 18.3606, Test Acc: 20.26%
+[7/10] Epoch Train Loss: 19.4154, Train Acc: 15.68% | Test Loss: 18.6737, Test Acc: 18.90%
+[8/10] Epoch Train Loss: 19.3832, Train Acc: 15.82% | Test Loss: 19.4243, Test Acc: 15.64%
+[9/10] Epoch Train Loss: 19.5305, Train Acc: 15.18% | Test Loss: 19.4749, Test Acc: 15.42%
+[10/10] Epoch Train Loss: 19.8483, Train Acc: 13.80% | Test Loss: 19.2585, Test Acc: 16.36%

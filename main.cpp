@@ -1,4 +1,4 @@
-#include "models/MLP.hpp"
+#include "models/CNN.hpp"
 #include "utils/load_dataset.hpp"
 #include <chrono>
 

@@ -19,8 +19,8 @@ if(OpenMP_FOUND)
 endif()
 
 # Ruta de OpenCV (ajústala si es necesario)
-set(OpenCV_DIR "/home/lupo/Documents/opencv/build")
-find_package(OpenCV REQUIRED)
+#set(OpenCV_DIR "/home/lupo/Documents/opencv/build")
+#find_package(OpenCV REQUIRED)
 
 # Incluye tus directorios
 include_directories(
@@ -32,8 +32,7 @@ include_directories(
 # Archivos fuente
 add_executable(main 
   main.cpp  
-  models/perceptron.hpp 
-  models/singleLayerPerceptron.hpp 
+
   models/layers
   models/layers/layer.hpp
   models/layers/dense_layer.hpp 
@@ -43,8 +42,7 @@ add_executable(main
 
 add_executable(test 
   test.cpp  
-  models/perceptron.hpp 
-  models/singleLayerPerceptron.hpp 
+
   utils/activations.hpp 
   utils/load_dataset.hpp
 )

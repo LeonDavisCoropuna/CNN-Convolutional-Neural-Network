@@ -1,14 +1,15 @@
-#include "models/MLP.hpp"
+#include "models/CNN.hpp"
 #include "utils/load_dataset.hpp"
 #include <chrono>
 #include <iostream>
 #include <random>
 #include <vector>
 #include <iomanip>
+#include "utils/activation_layer.hpp"
 
 mt19937 Layer::gen(32);
 
-// 🔍 Visualiza la predicción del modelo para una imagen específica
+//  Visualiza la predicción del modelo para una imagen específica
 void visualizePrediction(CNN& model,
                          const std::vector<float>& image,
                          const std::vector<float>& oneHotLabel) {
@@ -40,10 +41,10 @@ void visualizePrediction(CNN& model,
 
 int main() {
     // Cargar dataset
-    auto trainImages = MNISTDataset::loadImages("mnist_data/train-images.idx3-ubyte", 2000);
-    auto trainLabels = MNISTDataset::loadLabels("mnist_data/train-labels.idx1-ubyte", 2000);
-    auto testImages  = MNISTDataset::loadImages("mnist_data/t10k-images.idx3-ubyte", 2000);
-    auto testLabels  = MNISTDataset::loadLabels("mnist_data/t10k-labels.idx1-ubyte", 2000);
+    auto trainImages = MNISTDataset::loadImages("mnist_data/train-images.idx3-ubyte", 5000);
+    auto trainLabels = MNISTDataset::loadLabels("mnist_data/train-labels.idx1-ubyte", 5000);
+    auto testImages  = MNISTDataset::loadImages("mnist_data/t10k-images.idx3-ubyte", 5000);
+    auto testLabels  = MNISTDataset::loadLabels("mnist_data/t10k-labels.idx1-ubyte", 5000);
 
     std::cout << "Cargadas " << trainImages.size() << " imágenes de entrenamiento.\n";
     std::cout << "Cargadas " << testImages.size() << " imágenes de prueba.\n";
@@ -55,19 +56,20 @@ int main() {
     CNN cnn(learningRate, adam);
 
     // Construir arquitectura
-    cnn.addLayer(new Conv2DLayer(1, 8, 3, 28, 28));    // -> [8, 26, 26]
-    cnn.addLayer(new PoolingLayer(8, 26, 26));         // -> [8, 13, 13]
-    cnn.addLayer(new Conv2DLayer(8, 16, 3, 13, 13));   // -> [16, 11, 11]
-    cnn.addLayer(new PoolingLayer(16, 11, 11));        // -> [16, 5, 5]
-    cnn.addLayer(new Conv2DLayer(16, 32, 3, 5, 5));    // -> [32, 3, 3]
-    cnn.addLayer(new PoolingLayer(32, 3, 3));          // -> [32, 1, 1]
+    cnn.addLayer(new Conv2DLayer(1, 8, 3, 28, 28,  new ReLU()));    // [8, 26, 26]
+    cnn.addLayer(new PoolingLayer(8, 26, 26));         // [8, 13, 13]
+    cnn.addLayer(new Conv2DLayer(8, 16, 3, 13, 13,  new ReLU()));   // [16, 11, 11]
+    cnn.addLayer(new PoolingLayer(16, 11, 11));        // [16, 5, 5]
+    cnn.addLayer(new Conv2DLayer(16, 32, 3, 5, 5,  new ReLU()));    // [32, 3, 3]
+    cnn.addLayer(new PoolingLayer(32, 3, 3));          // [32, 1, 1]
+    
     cnn.addLayer(new DenseLayer(32, 16, new ReLU(), adam));
-    cnn.addLayer(new DropoutLayer(0.2f));
+    //cnn.addLayer(new DropoutLayer(0.2f));
     cnn.addLayer(new DenseLayer(16, 10, new Softmax(), adam));
     cnn.setLoss(new CrossEntropyLoss());
 
     // Entrenar modelo
-    cnn.train(20, trainImages, trainLabels, testImages, testLabels, 32, "output/test-conv2d.txt");
+    cnn.train(10, trainImages, trainLabels, testImages, testLabels, 32, "output/test-conv2dAS.txt");
 
     // Visualizar una predicción
     visualizePrediction(cnn, trainImages[0], trainLabels[0]);

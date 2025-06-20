@@ -1,202 +1,189 @@
-# MLP-Multi-Layer-Perceptron (MNIST) - L2 & Dropout
 
-By Leon Davis.
+# CNN para MNIST con C++ (Convolucional + Pooling + Dense + Dropout + Weight Decay)
 
-Este proyecto implementa una red neuronal perceptrón multicapa (MLP) entrenada para reconocer dígitos del 0 al 9 utilizando el dataset MNIST. Se ha desarrollado en C++ usando CMake como sistema de construcción y OpenCV para el manejo de imágenes.
+
+Este proyecto implementa una red convolucional (CNN) entrenada para reconocer dígitos (0–9) usando el dataset MNIST. Está desarrollado en C++ con CMake como sistema de construcción y sin dependencias pesadas más allá de librerías estándar para manejo de vectores/binarios. Se incluyeron capas convolucionales, pooling, dense, dropout y soporte a weight decay en el optimizador.
 
 ## 🔧 Requisitos
 
-* CMake >= 3.10
-* OpenCV >= 4.0
+- CMake >= 3.10  
+- Compilador C++17 compatible (e.g., gcc/g++ >= 7, clang >= 5)  
+- Opcional: OpenCV si quieres visión adicional (p.ej., mostrar imágenes), aunque la carga de MNIST se hace en binario sin OpenCV.  
 
-Asegúrate de tener instalados los requisitos antes de compilar.
+## 📁 Estructura del repositorio
 
-## Instalación
+- `models/`  
+  - `CNN.hpp`, `MLP.hpp` (si aún existe MLP),  
+  - `layers/`: define `Conv2DLayer`, `PoolingLayer`, `DenseLayer`, `DropoutLayer`, `ActivationLayer`, etc.  
+- `utils/`  
+  - `load_dataset.hpp`: carga imágenes/etiquetas MNIST en vectores normalizados,  
+  - `activations.hpp`, `optimizer.hpp`, `loss.hpp`.  
+- `main.cpp` o `test.cpp`: ejemplos de uso, entrenamiento y evaluación.  
+- `CMakeLists.txt`, `run.sh`: scripts para compilar y ejecutar.  
+- `README.md`: este archivo.
 
-Clona el repositorio y entra en la carpeta del proyecto:
+## 🚀 Instalación y compilación
 
-```bash
-git clone https://github.com/LeonDavisCoropuna/MLP-Multi-Layer-Perceptron.git
-cd MLP-Multi-Layer-Perceptron
-```
+1. Clona el repositorio y entra en la carpeta:
 
-Dale permisos de ejecución al script principal:
+   ``bash
+   git clone https://github.com/LeonDavisCoropuna/MLP-Multi-Layer-Perceptron.git
+   cd MLP-Multi-Layer-Perceptron
+  ``
 
-```bash
-chmod +x run.sh
-```
+2. Crea directorio de compilación y compila con CMake:
 
-Ejecuta el script para compilar y correr:
+   ``bash
+   mkdir build && cd build
+   cmake ..
+   make
+   ``
 
-```bash
-./run.sh main
-```
+   O usa el script:
 
-## Evaluación
-Se implementaron 5 casos con la misma arquitectura de 784x64x32x10:
-- Arquitectura normal.
-- Arquitectura con dropout de 0.2 entre capas
-- Arquitectura con weight decay de 0.01
-- Arquitectura con dropout 0.2 y weight decay 0.0005
-- Arquitectura con dropout 0.2 y weight decay 0.01
+   ``bash
+   chmod +x run.sh
+   ./run.sh main   # o ./run.sh test según tu objetivo
+   ``
+3. Asegúrate de tener los ficheros MNIST (`train-images.idx3-ubyte`, etc.) en la ruta esperada (`mnist_data/`). Si no, descárgalos desde el sitio oficial de Yann LeCun y colócalos en `mnist_data/`.
 
-### Caso 1 (sin drop ni weight decay):
-```cpp
-float learning_rate = 0.001f;
-float wd = 0;
+## ⚙️ Uso
 
-Optimizer *adam = new Adam(learning_rate, 0);
-MLP mlp(learning_rate, adam);
-
-mlp.add_layer(new DenseLayer(784, 64, new ReLU(), adam));
-mlp.add_layer(new DenseLayer(64, 32, new ReLU(), adam));
-mlp.add_layer(new DenseLayer(32, 10, new Softmax(), adam));
-mlp.set_loss(new CrossEntropyLoss());
-```
-
-![alt text](images/784x64x32x10-acc.png)
-![alt text](images/784x64x32x10-loss.png)
-
-Mejor Tess Accuracy en Epoch 19:
-  - Train Loss     : 0.0133
-  - Train Accuracy : 99.57%
-  - Test Loss      : 0.1286
-  - Test Accuracy  : 97.40%
-
-El modelo logró una alta precisión en el conjunto de entrenamiento (99.57%), lo que indica un ajuste casi perfecto a los datos de entrenamiento. Sin embargo, con la precisión de test (97.40%) se ve  un ligero sobreajuste. Sin embargo, el sobreajuste empieza desde el epoch 2 y desde allí la mejora del test no es tan evidente mientras que la mejora del train sigue aumentando sin parar.
-
-
-### Caso 2 (solo drop)
+En `main.cpp` (o `test.cpp`), se crea y entrena la CNN. Un ejemplo típico:
 
 ```cpp
-float learning_rate = 0.001f;
-float wd = 0;
+#include "models/CNN.hpp"
+#include "utils/load_dataset.hpp"
+#include <iostream>
+#include <iomanip>
 
-Optimizer *adam = new Adam(learning_rate, wd);
-MLP mlp(learning_rate, adam);
+int main() {
+    // 1) Cargar dataset MNIST (normalizado a [0,1])
+    auto trainImages = MNISTDataset::loadImages("mnist_data/train-images.idx3-ubyte", 60000);
+    auto trainLabels = MNISTDataset::loadLabels("mnist_data/train-labels.idx1-ubyte", 60000);
+    auto testImages  = MNISTDataset::loadImages("mnist_data/t10k-images.idx3-ubyte", 10000);
+    auto testLabels  = MNISTDataset::loadLabels("mnist_data/t10k-labels.idx1-ubyte", 10000);
 
-mlp.add_layer(new DenseLayer(784, 64, new ReLU(), adam));
-mlp.add_layer(new DropoutLayer(0.2));
-mlp.add_layer(new DenseLayer(64, 32, new ReLU(), adam));
-mlp.add_layer(new DropoutLayer(0.2));
-mlp.add_layer(new DenseLayer(32, 10, new Softmax(), adam));
-mlp.set_loss(new CrossEntropyLoss());
+    std::cout << "Cargadas " << trainImages.size() << " imágenes de entrenamiento.\n";
+    std::cout << "Cargadas " << testImages.size()  << " imágenes de prueba.\n";
+
+    // 2) Configurar optimizador y CNN
+    float learningRate = 0.001f;
+    float weightDecay  = 0.0005f;               // L2 regularization
+    Optimizer* adam    = new Adam(learningRate, weightDecay);
+    CNN cnn(learningRate, adam);
+
+    // 3) Construir arquitectura CNN
+    //    Conv + ReLU + Pooling  (input 28×28)
+    cnn.addLayer(new Conv2DLayer(1,  8, 3, 28, 28, new ReLU(), 1, 0));   // -> [8, 26, 26]
+    cnn.addLayer(new PoolingLayer(8, 26, 26));                          // -> [8, 13, 13]
+
+    cnn.addLayer(new Conv2DLayer(8, 16, 3, 13, 13, new ReLU(), 1, 0));  // -> [16, 11, 11]
+    cnn.addLayer(new PoolingLayer(16, 11, 11));                        // -> [16, 5, 5]
+
+    cnn.addLayer(new Conv2DLayer(16, 32, 3, 5, 5, new ReLU(), 1, 0));   // -> [32, 3, 3]
+    cnn.addLayer(new PoolingLayer(32, 3, 3));                          // -> [32, 1, 1]
+
+    // 4) Flatten implícito en DenseLayer: asume input_size = 32
+    cnn.addLayer(new DenseLayer(32, 16, new ReLU(), adam));
+    cnn.addLayer(new DropoutLayer(0.2f));                              // Dropout para regularizar
+    cnn.addLayer(new DenseLayer(16, 10, new Softmax(), adam));         // 10 clases
+    cnn.setLoss(new CrossEntropyLoss());
+
+    // 5) Entrenamiento
+    int epochs    = 10;
+    int batchSize = 32;
+    cnn.train(epochs, trainImages, trainLabels, testImages, testLabels, batchSize, "output/cnn-mnist.txt");
+
+    // 6) Evaluación puntual y visualización de ejemplo
+    float accTest = cnn.evaluate(testImages, testLabels);
+    std::cout << "Accuracy final en test: " << std::fixed << std::setprecision(2) << accTest << "%\n";
+
+    // (Opcional) mostrar predicción de una imagen
+    // visualizePrediction(cnn, testImages[0], testLabels[0]);
+
+    delete adam;
+    return 0;
+}
 ```
 
-![alt text](images/drop02-arch784x64x32x10-acc.png)
-![alt text](images/drop02-arch784x64x32x10-loss.png)
+Ajusta rutas y tamaños según tu dataset y recursos. El método `train` mostrará por época el Train Loss/Acc y Test Loss/Acc en formato:
 
-Mejor Tess Accuracy en Epoch 16:
-  - Train Loss     : 0.1026
-  - Train Accuracy : 96.92%
-  - Test Loss      : 0.0952
-  - Test Accuracy  : 97.43%
-
-El mejor modelo, la inclusión de dropout ayudó a reducir el sobreajuste, como lo evidencia el aumento en la precisión de prueba (97.43%) con respecto al caso base, aunque con una menor precisión de entrenamiento.
-
-### Caso 3 (solo weight decay)
-
-```cpp
-float learning_rate = 0.001f;
-float wd = 0.0005f;
-
-Optimizer *adam = new Adam(learning_rate, wd);
-MLP mlp(learning_rate, adam);
-
-mlp.add_layer(new DenseLayer(784, 64, new ReLU(), adam));
-mlp.add_layer(new DenseLayer(64, 32, new ReLU(), adam));
-mlp.add_layer(new DenseLayer(32, 10, new Softmax(), adam));
-mlp.set_loss(new CrossEntropyLoss());
+```
+[1/10] Epoch Train Loss: 2.3005, Train Acc: 11.00% | Test Loss: 2.3015, Test Acc: 10.24%
+...
 ```
 
-![alt text](images/wd-001-arch784x64x32x10-acc.png)
-![alt text](images/wd-001-arch784x64x32x10-loss.png)
+## 🧪 Experimentación y Regularización
 
-Mejor Tess Accuracy en Epoch 19:
-  - Train Loss     : 0.2403
-  - Train Accuracy : 93.59%
-  - Test Loss      : 0.2748
-  - Test Accuracy  : 91.65%
+Se recomienda experimentar variaciones en:
 
-El weight decay aplicado fue probablemente demasiado fuerte, lo que resultó en una reducción significativa del rendimiento tanto en entrenamiento como en prueba (Train: 93.59%, Test: 91.65%). Este caso muestra cómo una penalización excesiva puede dificultar el aprendizaje.
+* **Dropout**: p.ej., 0.2 ó 0.5 entre capas Dense tras flatten. Reduce sobreajuste.
+* **Weight decay (L2)**: ajustar parámetro en el optimizador (`Adam(learningRate, weightDecay)`). Valores típicos: 0.0005, 0.0001.
+* **Arquitectura**: cambiar número de filtros en Conv2D (8→16→32…), profundidad, tamaño de kernels, añadir más capas.
+* **Tasa de aprendizaje**: probar 0.001, 0.0005, etc.
+* **Batch size**: típicamente 32 o 64.
 
-### Caso 4 (drop 0.2 y wd 0.01)
+### Ejemplo de experimentos (resultados referenciales)
 
-```cpp
-float learning_rate = 0.001f;
-float wd = 0.01f;
+1. **Arquitectura básica (sin dropout, sin weight decay)**
 
-Optimizer *adam = new Adam(learning_rate, wd);
-MLP mlp(learning_rate, adam);
+   * Conv(1→8) + pool → Conv(8→16) + pool → Conv(16→32) + pool → Dense(32→16) → Dense(16→10).
+   * learningRate=0.001, weightDecay=0.
+   * Puede converger lentamente y tender a sobreajuste si se entrena muchas épocas.
 
-mlp.add_layer(new DenseLayer(784, 64, new ReLU(), adam));
-mlp.add_layer(new DenseLayer(64, 32, new ReLU(), adam));
-mlp.add_layer(new DenseLayer(32, 10, new Softmax(), adam));
-mlp.set_loss(new CrossEntropyLoss());
-```
+2. **Con Dropout 0.2**
 
-![alt text](images/drop02-wd-0.01-arch784x64x32x10-acc.png)
-![alt text](images/drop02-wd-001-arch784x64x32x10-loss.png)
+   * Añadir `DropoutLayer(0.2f)` antes de la última Dense.
+   * Suele mejorar generalización, especialmente con pocas imágenes o redes grandes.
 
-Mejor Tess Accuracy en Epoch 9:
-  - Train Loss     : 0.3758
-  - Train Accuracy : 89.44%
-  - Test Loss      : 0.2678
-  - Test Accuracy  : 92.37%
+3. **Con Weight Decay moderado (0.0005)**
 
-Este enfoque combinó dos técnicas de regularización, pero el valor alto de weight decay nuevamente afectó negativamente el aprendizaje. Aunque el modelo evitó el sobreajuste (Train: 89.44%, Test: 92.37%), su capacidad de alcanzar altos niveles de precisión fue limitada. Este experimento confirma que una penalización muy fuerte no se compensa con dropout.
+   * En `Adam(learningRate, 0.0005f)`.
+   * Penaliza pesos grandes, ayuda a generalizar. Ajustar si disminuye demasiado capacidad de aprendizaje.
 
-### Caso 5 (drop 0.2 y wd 0.0005)
+4. **Combinación Dropout + Weight Decay**
 
-```cpp
-float learning_rate = 0.001f;
-float wd = 0.0005f;
+   * Ejemplo: Dropout 0.2 + weightDecay 0.0005.
+   * Buena práctica para equilibrar regularización.
 
-Optimizer *adam = new Adam(learning_rate, wd);
-MLP mlp(learning_rate, adam);
+Para cada experimento se registra Train/Test Loss y Accuracy por época, y se analiza curva para detectar sobreajuste. Al final, elegir configuración que maximice accuracy en test con pérdida razonable.
 
-mlp.add_layer(new DenseLayer(784, 64, new ReLU(), adam));
-mlp.add_layer(new DenseLayer(64, 32, new ReLU(), adam));
-mlp.add_layer(new DenseLayer(32, 10, new Softmax(), adam));
-mlp.set_loss(new CrossEntropyLoss());
-```
+## 📈 Visualización de métricas
 
-![alt text](images/drop02-wd-0005-arch784x64x32x10-acc.png)
-![alt text](images/drop02-wd-0005-arch784x64x32x10-acc.png)
+* El archivo de logs (`output/cnn-mnist.txt`) contendrá líneas por época con métricas.
+* Puedes plotear offline (p.ej., exportar a CSV) para ver curvas de loss/accuracy.
+* Opcional: implementar en C++ o en Python un script que lea ese log y grafique.
 
-Mejor Tess Accuracy en Epoch 19:
-  - Train Loss     : 0.1456
-  - Train Accuracy : 95.72%
-  - Test Loss      : 0.0866
-  - Test Accuracy  : 97.35%
+## 🛠 Estructura de código relevante
 
-Esta combinación equilibrada produjo uno de los mejores resultados generales, con alta precisión en test (97.35%) y buena capacidad de generalización. El modelo evitó el sobreajuste severo y logró un rendimiento comparable al mejor caso (caso 2), pero con una regularización más controlada. Es una configuración óptima entre complejidad y generalización.
+* **`Conv2DLayer`**: implementa convolución 2D manual, guarda pre-activaciones y calcula backward con derivada correcta.
+* **`PoolingLayer`**: max-pooling 2×2 por defecto, con backward que propaga gradiente solo al índice max.
+* **`ActivationLayer`**: envuelve función de activación genérica (ReLU, Sigmoid, Tanh, etc.).
+* **`DenseLayer`**: capa fully-connected, soporta Softmax en salida.
+* **`DropoutLayer`**: en modo entrenamiento descarta unidades aleatoriamente, en evaluación pasa sin cambio.
+* **`Optimizer`**: p.ej. `SGD`, `Adam`, implementan update con weight decay.
+* **`Loss`**: `CrossEntropyLoss` para clasificación multiclase, usuada junto con Softmax.
+* **`load_dataset.hpp`**: carga binario MNIST y normaliza a \[0,1], devuelve vectores `<vector<float>>` para imágenes y `<vector<float>>` one-hot para etiquetas, o índices según convención.
 
-### Recopilación
-#### Gráfica de de loss solo en el conjunto de tess
+## 💡 Buenas prácticas
 
-![alt text](images/all-test-loss.png)
+* Comprueba tras cambios en backward que no aparezcan `NaN` en loss inicial. Usa assert o prints con `std::isfinite`.
+* Verifica que `preActivations` se use en derivadas y no el valor ya activado.
+* Ajusta semilla fija (`Layer::gen(32)`) para reproducibilidad.
+* Usa batch size >= 16 para mejor convergencia y velocidad.
+* Normaliza entrada (ya en \[0,1]). Si quisieras normalizar con media y desviación, ajusta según convenga.
+* Monitoriza learning rate: si loss no baja, prueba reducir lr.
 
-Directamente aquí se observa que aplicar un L2 con valor de 0.01 aumenta la perdida de los modelos al ser un valor muy grande, es mucho mejor un valor mas pequeño como 0.0005. También es notorio que la curva del modelo sin L2 ni dropout empieza bien, pero conforme aumentan los epochs cada vez aumenta su perdida indicando que el sobreajuste se hará mayor a más epochs.
+## 🔗 Enlaces y código
 
-#### Gráfica de accuracy solo en el conjunto de tess
+* Repositorio en GitHub:
 
-![alt text](images/all-test-acc.png)
-Aquí se observa que al igual que en loss los peores modelos son los que tienen un L2 de 0.01. El accuracy de los otros modelos es muy bueno, y el que reslta más es el que implementa solo dropout alcanzando el mayor accuracy.
+  ```
+  https://github.com/LeonDavisCoropuna/MLP-Multi-Layer-Perceptron.git
+  ```
+* Carpeta principal:
 
-## Conclusiones
+  * `models/` contiene implementación de CNN/MLP y capas.
+  * `utils/` contiene cargas, funciones de activación, optimizador, pérdida.
 
-### 1. El uso de dropout mejoró la generalización del modelo sin afectar significativamente la precisión.
-En el segundo caso (solo dropout), se observó una mayor regularización respecto al modelo base. Aunque la precisión en entrenamiento disminuyó ligeramente (96.92% frente a 99.57%), la precisión en test fue incluso superior (97.43% vs. 97.40%), con menor test loss. Esto indica que el dropout ayudó a prevenir el sobreajuste.
-
-### 2. El weight decay por sí solo no fue suficiente y redujo notablemente la capacidad del modelo.
-En el tercer caso (solo weight decay), la precisión en test cayó a 91.65% y la pérdida fue mucho mayor que en los demás casos demotrando que un alto valor de L2 (0.01) afectaría negativamente al modelo incluso añadiendo dropout.
-
-### 3. La combinación de dropout y weight decay moderado logró un buen equilibrio entre regularización y rendimiento.
-El quinto caso (dropout 0.2 + weight decay 0.0005) logró un rendimiento muy competitivo con 97.35% de test accuracy y el menor test loss (0.0866) de todos los casos. Esta combinación favoreció tanto la regularización como la capacidad de aprendizaje, logrando un modelo robusto y eficaz. A diferencia del cuarto caso (dropout + wd 0.01), donde un wd más alto redujo significativamente el rendimiento, esta configuración muestra que la sinergia entre técnicas debe mantenerse en valores equilibrado
-
-## Ver código en github:
-La parte principal del código se encuentra en la carpeta models/ (MLP, layers) y en utils/ (optimizadores, funciones de perdida y activación)
-```bash
-https://github.com/LeonDavisCoropuna/MLP-Multi-Layer-Perceptron.git
-```

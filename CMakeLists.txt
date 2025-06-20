@@ -19,7 +19,7 @@ if(OpenMP_FOUND)
 endif()
 
 # Ruta de OpenCV (ajústala si es necesario)
-set(OpenCV_DIR "/home/leon/Documentos/UNSA/TOPICOS IA/opencv/build")
+set(OpenCV_DIR "/home/lupo/Documents/opencv/build")
 find_package(OpenCV REQUIRED)
 
 # Incluye tus directorios

@@ -6,6 +6,7 @@ std::mt19937 Layer::gen(32); // Semilla para reproducibilidad
 
 int main()
 {
+  /*
   auto train_data = load_dataset_numbers("mnist_data/saved_images/train");
   auto test_data = load_dataset_numbers("mnist_data/saved_images/test");
 
@@ -36,6 +37,6 @@ int main()
   std::cout << "Tiempo total de entrenamiento: " << duration.count() << " segundos" << std::endl;
 
   mlp.evaluate(test_data.first, test_data.second);
-
+  */
   return 0;
 }

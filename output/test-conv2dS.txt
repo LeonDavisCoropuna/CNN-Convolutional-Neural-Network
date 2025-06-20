@@ -6,10 +6,10 @@
 [6/20] Epoch Train Loss: 20.6542, Train Acc: 10.30% | Test Loss: 20.5276, Test Acc: 10.85%
 [7/20] Epoch Train Loss: 20.6081, Train Acc: 10.50% | Test Loss: 20.5276, Test Acc: 10.85%
 [8/20] Epoch Train Loss: 20.5736, Train Acc: 10.65% | Test Loss: 20.5276, Test Acc: 10.85%
-[9/20] Epoch Train Loss: 20.5160, Train Acc: 10.90% | Test Loss: 20.5276, Test Acc: 10.85%
+[9/20] Epoch Train Loss: 20.5276, Train Acc: 10.85% | Test Loss: 20.5276, Test Acc: 10.85%
 [10/20] Epoch Train Loss: 20.6312, Train Acc: 10.40% | Test Loss: 20.5276, Test Acc: 10.85%
 [11/20] Epoch Train Loss: 20.8269, Train Acc: 9.55% | Test Loss: 20.5276, Test Acc: 10.85%
-[12/20] Epoch Train Loss: 20.4585, Train Acc: 11.15% | Test Loss: 20.5276, Test Acc: 10.85%
+[12/20] Epoch Train Loss: 20.4700, Train Acc: 11.10% | Test Loss: 20.5276, Test Acc: 10.85%
 [13/20] Epoch Train Loss: 20.5391, Train Acc: 10.80% | Test Loss: 20.5276, Test Acc: 10.85%
 [14/20] Epoch Train Loss: 20.6772, Train Acc: 10.20% | Test Loss: 20.5276, Test Acc: 10.85%
 [15/20] Epoch Train Loss: 20.6081, Train Acc: 10.50% | Test Loss: 20.5276, Test Acc: 10.85%
